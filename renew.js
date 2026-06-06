@@ -2,6 +2,29 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 
+// TG 通知函数
+async function sendTG(message) {
+  const token = process.env.TG_BOT_TOKEN;
+  const chatId = process.env.TG_CHAT_ID;
+  
+  if (!token || !chatId || token.includes('替换')) {
+    console.log('未配置有效的 TG 参数，跳过通知。');
+    return;
+  }
+
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' })
+    });
+    console.log('📢 TG 通知已发送！');
+  } catch (e) {
+    console.error("❌ TG推送失败:", e.message);
+  }
+}
+
 (async () => {
   // 确保截图保存目录存在
   const screenshotDir = path.join(__dirname, 'screenshots');
