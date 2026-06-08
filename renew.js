@@ -40,7 +40,6 @@ async function sendTG(message) {
   const page = await context.newPage();
 
   try {
-    // 🚨 修正点 1：直接前往图2的登录专属页面
     console.log('🚀 正在打开 Freemchost 登录页面...');
     await page.goto('https://new.freemchost.com/login', { waitUntil: 'networkidle', timeout: 60000 }); 
 
@@ -49,30 +48,23 @@ async function sendTG(message) {
     await page.locator('input[type="email"]').fill(process.env.FREE_EMAIL);
     await page.locator('input[type="password"]').fill(process.env.FREE_PASSWORD);
     
-    // 匹配图2中的红色的 "Sign in" 按钮
     console.log('🔐 正在尝试登录...');
     await page.locator('button:has-text("Sign in")').click();
     
-    // 等待跳转到图3的控制台页面
     console.log('⏳ 等待登录跳转...');
     await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
     console.log('✅ 登录成功！');
 
-    // 🚨 修正点 2：直接跳转到你的服务器详情页（对应图5）
     console.log('📂 正在直达服务器详情页...');
     await page.goto(process.env.SERVER_PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 });
 
-    // 🚨 修正点 3：必须先点击 "Manage" 标签页
     console.log('🗂️ 正在切换到 [Manage] 标签页...');
-    // 使用精准匹配，寻找文字完全等于 Manage 的元素并点击
     const manageTab = page.getByText('Manage', { exact: true });
     await manageTab.waitFor({ state: 'visible', timeout: 15000 });
     await manageTab.click();
 
-    // 稍微等 2 秒，让 Manage 页面里的内容加载出来
     await page.waitForTimeout(2000);
 
-    // 此时图6中的续期按钮才会出现
     console.log('🔍 正在寻觅红色的 [Renew now] 按钮...');
     const renewBtn = page.locator('button:has-text("Renew now")').last();
     
@@ -81,10 +73,15 @@ async function sendTG(message) {
     if (await renewBtn.isVisible()) {
       await renewBtn.click();
       console.log('🎉 【成功】已精准点击续期按钮！');
-      // 留出 5 秒等待后端确认请求
+      
+      // 🚨 新增：调用 TG 发送成功通知！
+      await sendTG(`🎉 <b>Freemchost 自动续期成功</b>\n\n<b>状态:</b> GitHub 机器人已成功登录并点击续期按钮。\n<b>时间:</b> ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`);
+      
       await page.waitForTimeout(5000);
     } else {
       console.log('⚠️ 未找到续期按钮，可能已被续期，或者页面结构有变。');
+      // 🚨 新增：调用 TG 发送跳过通知
+      await sendTG(`⚠️ <b>Freemchost 续期跳过</b>\n\n<b>状态:</b> 页面上未找到 Renew now 按钮，可能时间未到或页面变动。`);
     }
 
   } catch (error) {
@@ -94,12 +91,14 @@ async function sendTG(message) {
     const screenshotPath = path.join(screenshotDir, `error-${timestamp}.png`);
     
     try {
-      // 拍下案发现场
       await page.screenshot({ path: screenshotPath, fullPage: true });
       console.log(`📸 现场截图已保存至: ${screenshotPath}`);
     } catch (screenshotError) {
       console.error('❌ 截图保存失败:', screenshotError.message);
     }
+    
+    // 🚨 新增：调用 TG 发送失败报警！
+    await sendTG(`🚨 <b>Freemchost 自动续期失败</b>\n\n<b>错误详情:</b> <code>${error.message.substring(0, 150)}...</code>\n<b>排查:</b> 脚本已异常退出，请前往 GitHub Actions 页面下载案发现场截图！`);
     
     process.exit(1);
   } finally {
